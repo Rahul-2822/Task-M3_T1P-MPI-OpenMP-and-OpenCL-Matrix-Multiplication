@@ -1,0 +1,15 @@
+__kernel void matrix_multiply(
+    __global int* A, 
+    __global int* B, 
+    __global int* C, 
+    const int N, 
+    const int P) {
+    int row = get_global_id(0);
+    int col = get_global_id(1);
+
+    int sum = 0;
+    for (int k = 0; k < N; k++) {
+        sum += A[row * N + k] * B[k * P + col];
+    }
+    C[row * P + col] = sum;
+}
