@@ -1,0 +1,59 @@
+#include <mpi.h>
+#include <stdio.h>
+#include <stdlib.h>
+
+void multiplyMatrices(int *a, int *b, int *c, int rows, int n, int p) {
+    for (int i = 0; i < rows; i++) {
+        for (int j = 0; j < p; j++) {
+            c[i * p + j] = 0;
+            for (int k = 0; k < n; k++) {
+                c[i * p + j] += a[i * n + k] * b[k * p + j];
+            }
+        }
+    }
+}
+
+int main(int argc, char** argv) {
+    int m = 4, n = 4, p = 4; // Change sizes as needed
+    int rank, size;
+
+    MPI_Init(&argc, &argv);
+    MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+    MPI_Comm_size(MPI_COMM_WORLD, &size);
+
+    int *a, *b, *c;
+    int rowsPerProc = m / size;
+
+    if (rank == 0) {
+        a = (int *)malloc(m * n * sizeof(int));
+        b = (int *)malloc(n * p * sizeof(int));
+        c = (int *)malloc(m * p * sizeof(int));
+
+        for (int i = 0; i < m * n; i++) a[i] = i + 1;
+        for (int i = 0; i < n * p; i++) b[i] = i + 1;
+    }
+
+    int *sub_a = (int *)malloc(rowsPerProc * n * sizeof(int));
+    int *sub_c = (int *)malloc(rowsPerProc * p * sizeof(int));
+    int *b_buf = (rank == 0) ? b : (int *)malloc(n * p * sizeof(int));
+
+    MPI_Scatter(a, rowsPerProc * n, MPI_INT, sub_a, rowsPerProc * n, MPI_INT, 0, MPI_COMM_WORLD);
+    if (rank != 0) MPI_Bcast(b_buf, n * p, MPI_INT, 0, MPI_COMM_WORLD);
+    else b_buf = b;
+
+    multiplyMatrices(sub_a, b_buf, sub_c, rowsPerProc, n, p);
+    MPI_Gather(sub_c, rowsPerProc * p, MPI_INT, c, rowsPerProc * p, MPI_INT, 0, MPI_COMM_WORLD);
+
+    if (rank == 0) {
+        printf("Result Matrix:\n");
+        for (int i = 0; i < m; i++) {
+            for (int j = 0; j < p; j++) {
+                printf("%d ", c[i * p + j]);
+            }
+            printf("\n");
+        }
+    }
+
+    MPI_Finalize();
+    return 0;
+}
